@@ -39,7 +39,7 @@ import "github.com/cockroachdb/crcutil/crcdiff"
 
 f := crcdiff.Analyze32(crc32.Castagnoli, crc1, crc2, length)
 if f.Plausible() {
-    fmt.Println(f) // e.g. "crc32: single bit flip at offset 4, bit 5, ..."
+    fmt.Println(f) // e.g. "crc32/Castagnoli: single bit flip at ..."
 }
 ```
 
@@ -52,10 +52,14 @@ default threshold; use `FalsePositiveProbability` directly for a custom rule.
 
 ```
 go install github.com/cockroachdb/crcutil/cmd/crcdiff@latest
+crcdiff [-length N] [-crc32 IEEE|C] [-crc64 ISO|ECMA|NVME] <crc1> <crc2>
 ```
 
+or directly:
+
 ```
-crcdiff [-length N] [-crc32 IEEE|C] [-crc64 ISO|ECMA|NVME] <crc1> <crc2>
+go run github.com/cockroachdb/crcutil/cmd/crcdiff@latest \
+  [-length N] [-crc32 IEEE|C] [-crc64 ISO|ECMA|NVME] <crc1> <crc2>
 ```
 
 The two CRCs are hex values with either 8 digits (CRC32) or 16 digits (CRC64); a
