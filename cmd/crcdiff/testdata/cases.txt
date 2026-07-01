@@ -32,7 +32,7 @@ crc64/ECMA: 3 bits flipped across 2 byte(s) at offset 10, mask=0x0580 (false pos
 # --- CRC32 IEEE poly, 50-byte stream, byte 7 bit 0 ---
 -length 50 -crc32 IEEE b50c79ff f21f8f04
 ----
-crc32/IEEE: single bit flip at offset 7, bit 0, mask=0x01 (false positive probability 1 in 2603010)
+crc32/IEEE: single bit flip at offset 7, bit 0, mask=0x01 (false positive probability 1 in 2603011)
 
 # --- identical CRCs ---
 -length 1000 dd2edff7 dd2edff7
@@ -47,14 +47,14 @@ no plausible finding
 # --- no length: warning on stderr, end-relative offset (64-bit) ---
 387e868bd14debed 474f78c3e9de5763
 ----
-warning: -length not specified; pass it for an accurate false-positive probability (the probability grows with length). Searched up to 1073741824 bytes; offsets are relative to the end of the stream.
+warning: -length not specified; pass it for best results. Searched up to 1073741824 bytes; offsets are relative to the end of the stream.
 crc64/NVME: single bit flip at offset -100, bit 2, mask=0x04 (false positive probability 1 in 264305680)
 
 # --- no length: 32-bit, end-relative offset ---
 dd2edff7 b1b11dc1
 ----
-warning: -length not specified; pass it for an accurate false-positive probability (the probability grows with length). Searched up to 524288 bytes; offsets are relative to the end of the stream.
-crc32/Castagnoli: single bit flip at offset -877, bit 4, mask=0x10 (false positive probability 1 in 248)
+warning: -length not specified; pass it for best results. Searched up to 524288 bytes; offsets are relative to the end of the stream.
+crc32/Castagnoli: single bit flip at offset -877, bit 4, mask=0x10 (false positive probability 1 in 249)
 
 # --- error: mismatched widths ---
 -length 1000 dd2edff7 474f78c3e9de5763

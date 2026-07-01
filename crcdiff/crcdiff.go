@@ -25,12 +25,6 @@ import (
 	"math/bits"
 )
 
-// DefaultMaxFalsePositive is the threshold used by Finding.Plausible: a finding
-// is considered plausible when its FalsePositiveProbability is at or below this
-// value. Callers wanting a different rule should use FalsePositiveProbability
-// directly.
-const DefaultMaxFalsePositive = 0.01
-
 // Finding describes the simplest data difference that turns crc1 into crc2: XOR
 // Mask into the (first) stream starting at byte Offset and its checksum becomes
 // crc2.
@@ -58,32 +52,48 @@ func (f *Finding) BitCount() int {
 	return n
 }
 
-// FalsePositiveProbability estimates the probability that the difference between
-// two unrelated CRCs (i.e. random data, not a genuine localized corruption)
-// would, by chance, yield a finding at least as simple as this one.
+// FalsePositiveProbability estimates the probability that the difference
+// between two unrelated CRCs (i.e. random data, not a genuine localized
+// corruption) would, by chance, yield a finding at least as simple as this one.
 //
-// The search examines roughly Length alignments; at each, a random CRC produces
-// a uniformly distributed width-bit window. The probability that one such window
-// has at most BitCount set bits is S/2^width, where S is the number of width-bit
-// values with population count <= BitCount. Union-bounding over the alignments
-// gives Length*S/2^width, capped at 1.
-//
-// A value near 0 means the finding is highly distinctive (a real single-bit flip
-// in a short stream); a value near 1 means it is no better than what random data
-// would produce (e.g. a dense, full-width mask).
+// A value near 0 means the finding is highly distinctive (a real single-bit
+// flip in a short stream); a value near 1 means it is no better than what
+// random data would produce (e.g. a dense, full-width mask).
 func (f *Finding) FalsePositiveProbability() float64 {
+	// The search examines roughly Length alignments; at each, a random CRC
+	// produces a uniformly distributed width-bit window that has at most BitCount
+	// set bits with per-alignment probability q = S/2^width, where S is the
+	// number of width-bit values with population count <= BitCount. Treating the
+	// alignments as independent, the probability that at least one of the N =
+	// Length alignments is at least this simple is 1 - (1-q)^N.
 	width := f.Kind.Width
 	count := 0.0
 	for i := 0; i <= f.BitCount(); i++ {
 		count += binom(width, i)
 	}
-	p := float64(f.Length) * count / math.Exp2(float64(width))
-	return math.Min(1, p)
+	q := count / math.Exp2(float64(width))
+	return stableUnionProbability(q, float64(f.Length))
 }
 
-// Plausible reports whether the finding looks like genuine localized corruption,
-// i.e. its FalsePositiveProbability is at or below DefaultMaxFalsePositive.
-// Callers wanting a different rule should use FalsePositiveProbability directly.
+// stableUnionProbability returns 1 - (1-p)^n: the probability that at least one
+// of n independent trials, each succeeding with probability p, succeeds. It is
+// evaluated as -Expm1(n * Log1p(-p)) to avoid the catastrophic cancellation the
+// direct form suffers when p is tiny (the common case here). The result stays
+// in [0, 1] for p in [0, 1], so no clamping is needed.
+func stableUnionProbability(p, n float64) float64 {
+	return -math.Expm1(n * math.Log1p(-p))
+}
+
+// DefaultMaxFalsePositive is the threshold used by Finding.Plausible: a finding
+// is considered plausible when its FalsePositiveProbability is at or below this
+// value. Callers wanting a different rule should use FalsePositiveProbability
+// directly.
+const DefaultMaxFalsePositive = 0.01
+
+// Plausible reports whether the finding looks like genuine localized
+// corruption, i.e. its FalsePositiveProbability is at or below
+// DefaultMaxFalsePositive. Callers wanting a different rule should use
+// FalsePositiveProbability directly.
 func (f *Finding) Plausible() bool {
 	return f.FalsePositiveProbability() <= DefaultMaxFalsePositive
 }

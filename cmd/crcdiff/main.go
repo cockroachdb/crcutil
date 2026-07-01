@@ -190,8 +190,8 @@ func printResult(stdout, stderr io.Writer, f *crcdiff.Finding, relativeToEnd boo
 		// assumed maximum length only yields a conservative upper bound. Warn so
 		// the user knows to pass -length for an accurate result.
 		fmt.Fprintf(stderr,
-			"warning: -length not specified; pass it for an accurate false-positive probability "+
-				"(the probability grows with length). Searched up to %d bytes; "+
+			"warning: -length not specified; pass it for best results. "+
+				"Searched up to %d bytes; "+
 				"offsets are relative to the end of the stream.\n",
 			analysisLen)
 	}

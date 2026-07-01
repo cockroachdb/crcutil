@@ -223,11 +223,12 @@ func TestFindingMethods(t *testing.T) {
 }
 
 func TestFalsePositiveProbability(t *testing.T) {
-	// A single-bit flip in a short stream is extremely distinctive.
+	// A single-bit flip in a short stream is extremely distinctive. The estimate
+	// is 1 - (1-q)^N with q = (C(32,0)+C(32,1))/2^32 and N = Length.
 	single := &Finding{Kind: CRCKind{Width: 32}, Mask: []byte{0x01}, Length: 100}
-	// length * (C(32,0)+C(32,1)) / 2^32 = 100 * 33 / 2^32.
-	want := 100.0 * 33.0 / 4294967296.0
-	if got := single.FalsePositiveProbability(); math.Abs(got-want) > want*1e-9 {
+	q := 33.0 / 4294967296.0
+	want := 1 - math.Pow(1-q, 100)
+	if got := single.FalsePositiveProbability(); math.Abs(got-want) > want*1e-6 {
 		t.Errorf("single-bit FP = %g, want %g", got, want)
 	}
 	if got := single.FalsePositiveProbability(); got > 1e-5 {
@@ -238,6 +239,16 @@ func TestFalsePositiveProbability(t *testing.T) {
 	full := &Finding{Kind: CRCKind{Width: 32}, Mask: []byte{0xff, 0xff, 0xff, 0xff}, Length: 50}
 	if got := full.FalsePositiveProbability(); got != 1.0 {
 		t.Errorf("full-width FP = %g, want 1.0", got)
+	}
+
+	// When the per-alignment probability is high, the linear bound N*q exceeds 1
+	// and would clamp to exactly 1; the correct estimate 1 - (1-q)^N stays below
+	// it. Here width=8, BitCount=4, so q = sum_{i<=4} C(8,i) / 2^8.
+	dense := &Finding{Kind: CRCKind{Width: 8}, Mask: []byte{0x0f}, Length: 10}
+	q8 := (1.0 + 8 + 28 + 56 + 70) / 256.0
+	wantDense := 1 - math.Pow(1-q8, 10)
+	if got := dense.FalsePositiveProbability(); got >= 1 || math.Abs(got-wantDense) > 1e-12 {
+		t.Errorf("dense FP = %g, want %g (and strictly < 1)", got, wantDense)
 	}
 
 	// Probability scales with stream length.
