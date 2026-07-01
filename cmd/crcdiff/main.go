@@ -30,10 +30,6 @@ import (
 	"github.com/cockroachdb/crcutil/crcdiff"
 )
 
-// crc64NVME is the CRC-64/NVME polynomial in the reflected representation used
-// by hash/crc64 (the reflection of the normal-form 0xad93d23594c93659).
-const crc64NVME = 0x9a6c9329ac4bc9b5
-
 const (
 	maxLen32 = 512 * 1024         // 512 KiB
 	maxLen64 = 1024 * 1024 * 1024 // 1 GiB
@@ -129,7 +125,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		if *crc32Poly != "" {
 			return fmt.Errorf("-crc32 cannot be used with 64-bit CRCs")
 		}
-		poly := uint64(crc64NVME)
+		poly := uint64(crcdiff.CRC64NVME)
 		if *crc64Poly != "" {
 			if poly, err = poly64(*crc64Poly); err != nil {
 				return err
@@ -182,7 +178,7 @@ func poly64(name string) (uint64, error) {
 	case "ECMA":
 		return crc64.ECMA, nil
 	case "NVME":
-		return crc64NVME, nil
+		return crcdiff.CRC64NVME, nil
 	default:
 		return 0, fmt.Errorf("unknown crc64 polynomial %q (want ISO, ECMA, or NVME)", name)
 	}

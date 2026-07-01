@@ -125,8 +125,11 @@ func TestAnalyze64SingleBitAndBurst(t *testing.T) {
 				if f == nil {
 					t.Fatalf("%s len=%d: got nil finding", name, length)
 				}
-				if f.CRCWidth != 64 {
-					t.Errorf("%s: CRCWidth=%d, want 64", name, f.CRCWidth)
+				if f.Kind.Width != 64 {
+					t.Errorf("%s: Kind.Width=%d, want 64", name, f.Kind.Width)
+				}
+				if f.Kind.Poly != poly {
+					t.Errorf("%s: Kind.Poly=%#x, want %#x", name, f.Kind.Poly, poly)
 				}
 				if f.BitCount() != 1 {
 					t.Errorf("%s len=%d: BitCount=%d, want 1 (%s)", name, length, f.BitCount(), f)
@@ -183,18 +186,20 @@ func TestIdenticalAndDegenerate(t *testing.T) {
 }
 
 func TestFindingMethods(t *testing.T) {
-	single := &Finding{CRCWidth: 32, Offset: 42, Mask: []byte{0x08}, Length: 100}
+	c32 := CRCKind{Width: 32, Poly: crc32.Castagnoli}
+	single := &Finding{Kind: c32, Offset: 42, Mask: []byte{0x08}, Length: 100}
 	if single.BitCount() != 1 {
 		t.Errorf("BitCount=%d, want 1", single.BitCount())
 	}
 	if !single.Plausible() {
 		t.Errorf("single bit should be plausible (fp=%g)", single.FalsePositiveProbability())
 	}
-	if s := single.String(); !strings.Contains(s, "single bit flip") || !strings.Contains(s, "offset 42") {
+	if s := single.String(); !strings.Contains(s, "single bit flip") ||
+		!strings.Contains(s, "offset 42") || !strings.Contains(s, "crc32/Castagnoli") {
 		t.Errorf("unexpected String: %q", s)
 	}
 
-	multi := &Finding{CRCWidth: 32, Offset: 10, Mask: []byte{0x0c, 0x80}, Length: 100}
+	multi := &Finding{Kind: c32, Offset: 10, Mask: []byte{0x0c, 0x80}, Length: 100}
 	if multi.BitCount() != 3 {
 		t.Errorf("BitCount=%d, want 3", multi.BitCount())
 	}
@@ -203,7 +208,7 @@ func TestFindingMethods(t *testing.T) {
 	}
 
 	// A dense, near-full-width mask is no more distinctive than random data.
-	heavy := &Finding{CRCWidth: 32, Offset: 0, Mask: []byte{0xff, 0xff}, Length: 100}
+	heavy := &Finding{Kind: c32, Offset: 0, Mask: []byte{0xff, 0xff}, Length: 100}
 	if heavy.Plausible() {
 		t.Errorf("16 bits should be implausible (fp=%g)", heavy.FalsePositiveProbability())
 	}
@@ -219,7 +224,7 @@ func TestFindingMethods(t *testing.T) {
 
 func TestFalsePositiveProbability(t *testing.T) {
 	// A single-bit flip in a short stream is extremely distinctive.
-	single := &Finding{CRCWidth: 32, Mask: []byte{0x01}, Length: 100}
+	single := &Finding{Kind: CRCKind{Width: 32}, Mask: []byte{0x01}, Length: 100}
 	// length * (C(32,0)+C(32,1)) / 2^32 = 100 * 33 / 2^32.
 	want := 100.0 * 33.0 / 4294967296.0
 	if got := single.FalsePositiveProbability(); math.Abs(got-want) > want*1e-9 {
@@ -230,21 +235,21 @@ func TestFalsePositiveProbability(t *testing.T) {
 	}
 
 	// A full-width 4-byte mask is reproducible by chance with certainty.
-	full := &Finding{CRCWidth: 32, Mask: []byte{0xff, 0xff, 0xff, 0xff}, Length: 50}
+	full := &Finding{Kind: CRCKind{Width: 32}, Mask: []byte{0xff, 0xff, 0xff, 0xff}, Length: 50}
 	if got := full.FalsePositiveProbability(); got != 1.0 {
 		t.Errorf("full-width FP = %g, want 1.0", got)
 	}
 
 	// Probability scales with stream length.
-	short := &Finding{CRCWidth: 32, Mask: []byte{0x01}, Length: 10}
-	long := &Finding{CRCWidth: 32, Mask: []byte{0x01}, Length: 100000}
+	short := &Finding{Kind: CRCKind{Width: 32}, Mask: []byte{0x01}, Length: 10}
+	long := &Finding{Kind: CRCKind{Width: 32}, Mask: []byte{0x01}, Length: 100000}
 	if !(short.FalsePositiveProbability() < long.FalsePositiveProbability()) {
 		t.Errorf("FP should grow with length: short=%g long=%g",
 			short.FalsePositiveProbability(), long.FalsePositiveProbability())
 	}
 
 	// CRC64 single bit is far more distinctive than CRC32 at the same length.
-	c64 := &Finding{CRCWidth: 64, Mask: []byte{0x01}, Length: 100}
+	c64 := &Finding{Kind: CRCKind{Width: 64}, Mask: []byte{0x01}, Length: 100}
 	if !(c64.FalsePositiveProbability() < single.FalsePositiveProbability()) {
 		t.Errorf("crc64 single-bit FP %g should be < crc32 %g",
 			c64.FalsePositiveProbability(), single.FalsePositiveProbability())

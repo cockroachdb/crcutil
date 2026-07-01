@@ -38,12 +38,13 @@ type Finding struct {
 	// Length is the stream length (in bytes) the finding was computed for, used
 	// by FalsePositiveProbability. It is set by Analyze32/Analyze64.
 	Length int
-	// CRCWidth is the CRC width in bits: 32 or 64.
-	CRCWidth int
+	// Kind identifies the CRC (width and polynomial) the finding was computed
+	// for. It is set by Analyze32/Analyze64.
+	Kind CRCKind
 	// Offset is the byte offset in the stream where Mask applies.
 	Offset int
 	// Mask holds the bytes to XOR into the stream at Offset. Its length is
-	// between 1 and CRCWidth/8, with both the first and last byte non-zero.
+	// between 1 and Kind.Width/8, with both the first and last byte non-zero.
 	Mask []byte
 }
 
@@ -62,20 +63,21 @@ func (f *Finding) BitCount() int {
 // would, by chance, yield a finding at least as simple as this one.
 //
 // The search examines roughly Length alignments; at each, a random CRC produces
-// a uniformly distributed CRCWidth-bit window. The probability that one such
-// window has at most BitCount set bits is S/2^CRCWidth, where S is the number of
-// CRCWidth-bit values with population count <= BitCount. Union-bounding over the
-// alignments gives Length*S/2^CRCWidth, capped at 1.
+// a uniformly distributed width-bit window. The probability that one such window
+// has at most BitCount set bits is S/2^width, where S is the number of width-bit
+// values with population count <= BitCount. Union-bounding over the alignments
+// gives Length*S/2^width, capped at 1.
 //
 // A value near 0 means the finding is highly distinctive (a real single-bit flip
 // in a short stream); a value near 1 means it is no better than what random data
 // would produce (e.g. a dense, full-width mask).
 func (f *Finding) FalsePositiveProbability() float64 {
+	width := f.Kind.Width
 	count := 0.0
 	for i := 0; i <= f.BitCount(); i++ {
-		count += binom(f.CRCWidth, i)
+		count += binom(width, i)
 	}
-	p := float64(f.Length) * count / math.Exp2(float64(f.CRCWidth))
+	p := float64(f.Length) * count / math.Exp2(float64(width))
 	return math.Min(1, p)
 }
 
@@ -102,11 +104,11 @@ func (f *Finding) String() string {
 	if bc := f.BitCount(); bc == 1 {
 		// Mask is trimmed, so the single set bit is in Mask[0].
 		bit := bits.TrailingZeros8(f.Mask[0])
-		desc = fmt.Sprintf("crc%d: single bit flip at offset %d, bit %d, mask=0x%x",
-			f.CRCWidth, f.Offset, bit, f.Mask)
+		desc = fmt.Sprintf("%s: single bit flip at offset %d, bit %d, mask=0x%x",
+			f.Kind, f.Offset, bit, f.Mask)
 	} else {
-		desc = fmt.Sprintf("crc%d: %d bits flipped across %d byte(s) at offset %d, mask=0x%x",
-			f.CRCWidth, bc, len(f.Mask), f.Offset, f.Mask)
+		desc = fmt.Sprintf("%s: %d bits flipped across %d byte(s) at offset %d, mask=0x%x",
+			f.Kind, bc, len(f.Mask), f.Offset, f.Mask)
 	}
 	return fmt.Sprintf("%s (false positive probability %s)", desc, prob)
 }
@@ -136,7 +138,7 @@ func binom(n, k int) float64 {
 // any in-range explanation. The returned Mask has length 1..4.
 func Analyze32(poly uint32, crc1, crc2 uint32, length int) *Finding {
 	tab := ([256]uint32)(*crc32.MakeTable(poly))
-	return analyze(&tab, 4, crc1^crc2, length)
+	return analyze(&tab, 4, uint64(poly), crc1^crc2, length)
 }
 
 // Analyze64 is the CRC64 analogue of Analyze32. poly is a CRC64 polynomial in
@@ -144,7 +146,7 @@ func Analyze32(poly uint32, crc1, crc2 uint32, length int) *Finding {
 // returned Mask has length 1..8.
 func Analyze64(poly uint64, crc1, crc2 uint64, length int) *Finding {
 	tab := ([256]uint64)(*crc64.MakeTable(poly))
-	return analyze(&tab, 8, crc1^crc2, length)
+	return analyze(&tab, 8, poly, crc1^crc2, length)
 }
 
 // word is the set of CRC register types supported by the generic core.
@@ -154,8 +156,9 @@ type word interface {
 
 // analyze implements the search described in the package doc. tab is the CRC
 // table (tab[i] is the CRC of the single byte i), width is the CRC width in
-// bytes, t is crc1^crc2, and length is the stream length in bytes.
-func analyze[T word](tab *[256]T, width int, t T, length int) *Finding {
+// bytes, poly is the generator polynomial (reflected representation, recorded in
+// the Finding's Kind), t is crc1^crc2, and length is the stream length in bytes.
+func analyze[T word](tab *[256]T, width int, poly uint64, t T, length int) *Finding {
 	if t == 0 || length < 1 {
 		return nil
 	}
@@ -229,10 +232,10 @@ func analyze[T word](tab *[256]T, width int, t T, length int) *Finding {
 		mask[j-lo] = byte(bestW >> (8 * j))
 	}
 	return &Finding{
-		Length:   length,
-		CRCWidth: width * 8,
-		Offset:   bestOffset,
-		Mask:     mask,
+		Length: length,
+		Kind:   CRCKind{Width: width * 8, Poly: poly},
+		Offset: bestOffset,
+		Mask:   mask,
 	}
 }
 

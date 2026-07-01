@@ -72,11 +72,11 @@ the stream. Passing `-length` yields an accurate false-positive probability
 
 ```
 $ crcdiff -length 1000 dd2edff7 b1b11dc1
-crc32: single bit flip at offset 123, bit 4, mask=0x10 (false positive probability 1 in 130151)
+crc32/Castagnoli: single bit flip at offset 123, bit 4, mask=0x10 (false positive probability 1 in 130151)
 
 $ crcdiff -length 1000 387e868bd14debed 474f78c3e9de5763
-crc64: single bit flip at offset 900, bit 2, mask=0x04 (false positive probability 1 in 283796062672455)
+crc64/NVME: single bit flip at offset 900, bit 2, mask=0x04 (false positive probability 1 in 283796062672455)
 
 $ crcdiff -length 1000 -crc64 ECMA f033761aeb8e0b26 b25908d6d19f996b
-crc64: 3 bits flipped across 2 byte(s) at offset 10, mask=0x0580 (false positive probability 1 in 421688057463)
+crc64/ECMA: 3 bits flipped across 2 byte(s) at offset 10, mask=0x0580 (false positive probability 1 in 421688057463)
 ```

@@ -22,6 +22,6 @@ func ExampleAnalyze32() {
 	fmt.Println(f)
 	fmt.Println("plausible:", f.Plausible())
 	// Output:
-	// crc32: single bit flip at offset 4, bit 5, mask=0x20 (false positive probability 1 in 6850028)
+	// crc32/Castagnoli: single bit flip at offset 4, bit 5, mask=0x20 (false positive probability 1 in 6850028)
 	// plausible: true
 }
